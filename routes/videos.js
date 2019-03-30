@@ -1,73 +1,71 @@
 const router = require('express').Router();
 const Video = require('../models/video');
 
-router.post('/videos', async (req, res, next) => {
-  const {title, description, videoUrl} = req.body;
+router.get('/videos', async (request, response) => {
+  const videos = await Video.find({});
 
-  const newVideo = await new Video({title, description, videoUrl});
+  response.render('videos/index', {videos});
+});
 
-  newVideo.validateSync();
+router.get('/videos/create', (request, response) => {
+  response.render('videos/create');
+});
 
-  if (newVideo.errors) {
-    if (newVideo.errors.title) {
-      newVideo.errors.title.message = 'could not find title input';
-    } else if (newVideo.errors.videoUrl) {
-      newVideo.errors.videoUrl.message = 'Video URL required';
-    }
-    res.status(400).render('create', { newVideo });
+router.get('/videos/:id', async (request, response) => {
+  const video = await findVideo(request);
+
+  response.render('videos/show', {video});
+});
+
+router.get('/videos/:id/edit', async (request, response) => {
+  const video = await findVideo(request);
+
+  response.render('videos/edit', {video});
+});
+
+router.post('/videos/:id/updates', async (request, response) => {
+  const video = await findVideo(request);
+
+  buildVideo(video, request.body);
+
+  if (video.errors) {
+    response.status(400);
+    response.render('videos/edit', {video});
   } else {
-    const video = await newVideo.save();
-    res.status(302).render('videos/show', {video});
+    await video.save();
+
+    response.redirect(`/videos/${video._id}`);
   }
 });
 
-router.get('/videos/create', async (req, res, next) => {
-  res.render('create');
+router.post('/videos/:id/deletions', async (request, response) => {
+  const {id} = request.params;
+
+  await Video.deleteOne({ _id: id });
+
+  response.redirect('/');
 });
 
-router.get('/', async (req, res, next) => {
-  const videos = await Video.find({});
-  res.render('videos/index', {videos});
+router.post('/videos', async (request, response) => {
+  const video = new Video();
+
+
+
+  if (video.errors) {
+    response.status(400);
+    response.render('videos/create', {video});
+  } else {
+    await video.save();
+
+    response.redirect(`/videos/${video._id}`);
+  }
 });
 
-router.get('/videos/:id', async (req, res, next) => {
-  const newVideo = await Video.findById(req.params.id);
-  res.render('videos/show', {newVideo});
-});
+const findVideo = async (request) => {
+  const {id} = request.params;
 
-router.get('/videos/:id/edit', async (req, res, next) => {
-  const videoToEdit = await Video.findById(req.params.id);
-  res.render('videos/edit', {videoToEdit});
-});
+  return await Video.findOne({ _id: id });
+}
 
-router.post('/videos/:id/updates', async (req, res, next) => {
-  // console.log('post request id: ' + req.params.id);
-
-  const {title, videoUrl, description} = req.body;
-
-  const updatedVideo = await Video.findOne({_id: req.params.id});
-    updatedVideo.title = title;
-    updatedVideo.videoUrl = videoUrl;
-    updatedVideo.description = description;
-
-  updatedVideo.validateSync();
-
-    if (updatedVideo.errors) {
-      // console.log(`errors: ${JSON.stringify(updatedVideo.errors)}`);
-      const videoToEdit = updatedVideo;
-      res.status(400).render('videos/edit', { videoToEdit });
-    } else {
-      // console.log('debug 2')
-      updatedVideo.save();
-      // res.status(302).redirect(`/videos/show`);
-      res.status(302).redirect(`/videos/${updatedVideo._id}`);
-    }
-});
-
-router.post('/videos/:id/deletions', async (req, res, next) => {
-  console.log(':id = ' + req.params.id);
-   await Video.deleteOne({ _id: req.params.id});
-   res.redirect('/');
-});
 
 module.exports = router;
